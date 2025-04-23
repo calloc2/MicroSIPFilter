@@ -8,7 +8,8 @@ from ttkbootstrap.constants import *
 import yaml
 import webbrowser
 import json
-from ttkbootstrap.widgets import DateEntry 
+from ttkbootstrap.widgets import DateEntry
+from PIL import Image, ImageTk
 
 CONFIG_FILE = "config.json"
 
@@ -88,7 +89,18 @@ def main():
 
     root = tb.Window(themename=current_theme)
     root.title(translate("title"))
-    root.geometry("600x400")
+    root.geometry("800x600")
+    root.minsize(800, 600) 
+
+    icon_path = "assets/csv.ico"
+    if os.path.exists(icon_path):
+        root.iconbitmap(icon_path)
+
+    root.grid_rowconfigure(0, weight=1)
+    root.grid_columnconfigure(0, weight=1)
+
+    main_frame = ttk.Frame(root, padding=20)
+    main_frame.grid(row=0, column=0, sticky="nsew")
 
     menubar = tk.Menu(root)
 
@@ -109,15 +121,15 @@ def main():
 
     root.config(menu=menubar)
 
-    text_log = tk.Text(root, wrap=tk.WORD, font=("Consolas", 10), height=10)
+    text_log = tk.Text(main_frame, wrap=tk.WORD, font=("Consolas", 10), height=10)
     text_log.pack(expand=True, fill='both', padx=10, pady=10)
 
-    progress = ttk.Progressbar(root, mode="indeterminate", length=400)
+    progress = ttk.Progressbar(main_frame, mode="indeterminate", length=400)
     progress.pack(pady=10)
 
     convert_time_var = tk.BooleanVar(value=config.get("convert_time", False))
     convert_time_check = ttk.Checkbutton(
-        root,
+        main_frame,
         text=translate("convert_time"),
         variable=convert_time_var,
         bootstyle="info"
@@ -125,10 +137,10 @@ def main():
     convert_time_check.pack(pady=5)
 
     filter_type_var = tk.StringVar(value=config.get("filter_type", "in"))
-    filter_label = ttk.Label(root, text=translate("select_filter_type"), bootstyle="info")
+    filter_label = ttk.Label(main_frame, text=translate("select_filter_type"), bootstyle="info")
     filter_label.pack(pady=5)
     filter_type_combobox = ttk.Combobox(
-        root,
+        main_frame,
         textvariable=filter_type_var,
         values=["in", "miss", "both"],
         state="readonly",
@@ -137,7 +149,7 @@ def main():
     filter_type_combobox.pack(pady=5)
     filter_type_combobox.current(["in", "miss", "both"].index(config.get("filter_type", "in")))
 
-    date_frame = ttk.Frame(root)
+    date_frame = ttk.Frame(main_frame)
     date_frame.pack(pady=10)
 
     start_date_label = ttk.Label(date_frame, text="Start Date:", bootstyle="info")
@@ -165,61 +177,63 @@ def main():
 
     def filtrar_csv():
         log(translate("select_file"))
-        arquivo_csv = filedialog.askopenfilename(
+        arquivos_csv = filedialog.askopenfilenames(
             title=translate("select_file"),
             filetypes=[("CSV Files", "*.csv")]
         )
 
-        if not arquivo_csv:
+        if not arquivos_csv:
             log(translate("no_file_selected"))
             return
 
-        log(f"{translate('file_selected')} {arquivo_csv}")
+        log(f"{translate('file_selected')} {', '.join(arquivos_csv)}")
 
-        try:
-            progress.start()
-            df = pd.read_csv(arquivo_csv)
-            log(translate("csv_loaded"))
-        except Exception as e:
-            progress.stop()
-            log(f"{translate('error_loading')} {e}")
-            return
+        for arquivo_csv in arquivos_csv:
+            try:
+                progress.start()
+                df = pd.read_csv(arquivo_csv)
+                log(f"{translate('csv_loaded')} {arquivo_csv}")
+            except Exception as e:
+                progress.stop()
+                log(f"{translate('error_loading')} {arquivo_csv}: {e}")
+                continue
 
-        try:
-            time_as_datetime = pd.to_datetime(df['Time'], unit='s')
-            filter_type = filter_type_var.get()
+            try:
+                time_as_datetime = pd.to_datetime(df['Time'], unit='s')
+                filter_type = filter_type_var.get()
 
-            start_date = pd.to_datetime(start_date_entry.entry.get())
-            end_date = pd.to_datetime(end_date_entry.entry.get())
-            df = df[(time_as_datetime >= start_date) & (time_as_datetime <= end_date)]
+                start_date = pd.to_datetime(start_date_entry.entry.get())
+                end_date = pd.to_datetime(end_date_entry.entry.get())
+                df = df[(time_as_datetime >= start_date) & (time_as_datetime <= end_date)]
 
-            if filter_type == "in":
-                df_filtered = df[df['Type'] == 'in']
-                suffix = "in"
-            elif filter_type == "miss":
-                df_filtered = df[df['Type'] == 'miss']
-                suffix = "miss"
-            else:
-                df_filtered = df[df['Type'].isin(['in', 'miss'])]
-                suffix = "both"
+                if filter_type == "in":
+                    df_filtered = df[df['Type'] == 'in']
+                    suffix = "in"
+                elif filter_type == "miss":
+                    df_filtered = df[df['Type'] == 'miss']
+                    suffix = "miss"
+                else:
+                    df_filtered = df[df['Type'].isin(['in', 'miss'])]
+                    suffix = "both"
 
-            log(translate("total_filtered", filter_type=filter_type))
+                log(translate("total_filtered", filter_type=filter_type))
 
-            if convert_time_var.get():
-                df_filtered['Time'] = time_as_datetime.dt.strftime('%Y-%m-%d %H:%M:%S')
-                log(translate("time_converted"))
+                if convert_time_var.get():
+                    df_filtered['Time'] = time_as_datetime.dt.strftime('%Y-%m-%d %H:%M:%S')
+                    log(translate("time_converted"))
 
-            base, ext = os.path.splitext(arquivo_csv)
-            new_file = f"{base}_FILTERED_{suffix}.csv"
-            df_filtered.to_csv(new_file, index=False)
-            log(f"{translate('file_saved')} {new_file}")
-            messagebox.showinfo(translate("success"), f"{translate('file_saved')}:\n{new_file}")
-        except Exception as e:
-            log(f"{translate('error_processing')} {e}")
-        finally:
-            progress.stop()
+                base, ext = os.path.splitext(arquivo_csv)
+                new_file = f"{base}_FILTERED_{suffix}.csv"
+                df_filtered.to_csv(new_file, index=False)
+                log(f"{translate('file_saved')} {new_file}")
+            except Exception as e:
+                log(f"{translate('error_processing')} {arquivo_csv}: {e}")
+            finally:
+                progress.stop()
 
-    filter_button = ttk.Button(root, text=translate("filter_button"), command=filtrar_csv, bootstyle=SUCCESS)
+        messagebox.showinfo(translate("success"), translate("file_saved"))
+
+    filter_button = ttk.Button(main_frame, text=translate("filter_button"), command=filtrar_csv, bootstyle=SUCCESS)
     filter_button.pack(pady=10)
 
     root.mainloop()

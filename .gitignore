@@ -17,3 +17,5 @@ build/
 # Environment
 venv/
 .env
+
+config.json
