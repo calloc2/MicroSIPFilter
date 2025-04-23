@@ -8,6 +8,7 @@ from ttkbootstrap.constants import *
 import yaml
 import webbrowser
 import json
+from ttkbootstrap.widgets import DateEntry 
 
 CONFIG_FILE = "config.json"
 
@@ -44,6 +45,15 @@ translations = load_translation(current_language)
 def translate(key, **kwargs):
     return translations.get(key, key).format(**kwargs)
 
+def load_available_languages():
+    translations_dir = "translations"
+    languages = []
+    for file in os.listdir(translations_dir):
+        if file.endswith(".yaml"):
+            lang_code = os.path.splitext(file)[0]
+            languages.append(lang_code)
+    return languages
+
 def main():
     global current_language, translations
 
@@ -51,6 +61,8 @@ def main():
     current_language = config.get("language", "en")
     current_theme = config.get("theme", "superhero")
     translations = load_translation(current_language)
+
+    available_languages = load_available_languages()
 
     def update_language(lang):
         global translations
@@ -81,7 +93,7 @@ def main():
     menubar = tk.Menu(root)
 
     language_menu = tk.Menu(menubar, tearoff=0)
-    for lang_code in ["en", "pt", "es", "fr", "de", "it"]:
+    for lang_code in available_languages:
         lang_name = load_translation(lang_code)["language_name"]
         language_menu.add_command(label=lang_name, command=lambda l=lang_code: update_language(l))
     menubar.add_cascade(label=translate("language_menu"), menu=language_menu)
@@ -108,8 +120,7 @@ def main():
         root,
         text=translate("convert_time"),
         variable=convert_time_var,
-        bootstyle="info",
-        command=lambda: save_config({**config, "convert_time": convert_time_var.get()})
+        bootstyle="info"
     )
     convert_time_check.pack(pady=5)
 
@@ -125,10 +136,27 @@ def main():
     )
     filter_type_combobox.pack(pady=5)
     filter_type_combobox.current(["in", "miss", "both"].index(config.get("filter_type", "in")))
-    filter_type_combobox.bind(
-        "<<ComboboxSelected>>",
-        lambda e: save_config({**config, "filter_type": filter_type_var.get()})
+
+    date_frame = ttk.Frame(root)
+    date_frame.pack(pady=10)
+
+    start_date_label = ttk.Label(date_frame, text="Start Date:", bootstyle="info")
+    start_date_label.grid(row=0, column=0, padx=5)
+    start_date_entry = DateEntry(
+        date_frame,
+        dateformat="%Y-%m-%d",
+        bootstyle="info"
     )
+    start_date_entry.grid(row=0, column=1, padx=5)
+
+    end_date_label = ttk.Label(date_frame, text="End Date:", bootstyle="info")
+    end_date_label.grid(row=0, column=2, padx=5)
+    end_date_entry = DateEntry(
+        date_frame,
+        dateformat="%Y-%m-%d",
+        bootstyle="info"
+    )
+    end_date_entry.grid(row=0, column=3, padx=5)
 
     def log(msg):
         text_log.insert(tk.END, msg + '\n')
@@ -161,14 +189,18 @@ def main():
             time_as_datetime = pd.to_datetime(df['Time'], unit='s')
             filter_type = filter_type_var.get()
 
+            start_date = pd.to_datetime(start_date_entry.entry.get())
+            end_date = pd.to_datetime(end_date_entry.entry.get())
+            df = df[(time_as_datetime >= start_date) & (time_as_datetime <= end_date)]
+
             if filter_type == "in":
-                df_filtered = df[(df['Type'] == 'in') & (time_as_datetime.dt.year == 2024)]
+                df_filtered = df[df['Type'] == 'in']
                 suffix = "in"
             elif filter_type == "miss":
-                df_filtered = df[(df['Type'] == 'miss') & (time_as_datetime.dt.year == 2024)]
+                df_filtered = df[df['Type'] == 'miss']
                 suffix = "miss"
             else:
-                df_filtered = df[(df['Type'].isin(['in', 'miss'])) & (time_as_datetime.dt.year == 2024)]
+                df_filtered = df[df['Type'].isin(['in', 'miss'])]
                 suffix = "both"
 
             log(translate("total_filtered", filter_type=filter_type))
