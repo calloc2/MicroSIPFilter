@@ -104,10 +104,27 @@ def main():
 
     menubar = tk.Menu(root)
 
+    flag_images = {}
+    for lang_code in available_languages:
+        flag_path = f"assets/flags/{lang_code}.png"
+        if os.path.exists(flag_path):
+            flag_images[lang_code] = tk.PhotoImage(file=flag_path)
+
     language_menu = tk.Menu(menubar, tearoff=0)
     for lang_code in available_languages:
         lang_name = load_translation(lang_code)["language_name"]
-        language_menu.add_command(label=lang_name, command=lambda l=lang_code: update_language(l))
+        if lang_code in flag_images:
+            language_menu.add_command(
+                label=lang_name,
+                image=flag_images[lang_code],
+                compound=tk.LEFT,
+                command=lambda l=lang_code: update_language(l)
+            )
+        else:
+            language_menu.add_command(
+                label=lang_name,
+                command=lambda l=lang_code: update_language(l)
+            )
     menubar.add_cascade(label=translate("language_menu"), menu=language_menu)
 
     theme_menu = tk.Menu(menubar, tearoff=0)
