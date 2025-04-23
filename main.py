@@ -5,11 +5,62 @@ from tkinter import filedialog, messagebox
 from tkinter import ttk
 import ttkbootstrap as tb
 from ttkbootstrap.constants import *
+import yaml
+import webbrowser
+
+def load_translation(language):
+    with open(f"translations/{language}.yaml", "r", encoding="utf-8") as file:
+        return yaml.safe_load(file)
+
+current_language = "en"
+translations = load_translation(current_language)
+
+def translate(key, **kwargs):
+    return translations.get(key, key).format(**kwargs)
 
 def main():
+    global current_language, translations
+
+    def update_language(lang):
+        global translations
+        current_language = lang
+        translations = load_translation(lang)
+        root.title(translate("title"))
+        filter_label.config(text=translate("select_filter_type"))
+        convert_time_check.config(text=translate("convert_time"))
+        filter_button.config(text=translate("filter_button"))
+        menubar.entryconfig(0, label=translate("language_menu"))
+        menubar.entryconfig(1, label=translate("theme_menu"))
+        menubar.entryconfig(2, label=translate("about_menu"))
+
+    def update_theme(theme):
+        root.style.theme_use(theme)
+
+    def open_about():
+        webbrowser.open("https://github.com/calloc2/MicroSIPFilter")
+
     root = tb.Window(themename="superhero")
-    root.title("Microsip CSV Filter")
+    root.title(translate("title"))
     root.geometry("600x400")
+
+    menubar = tk.Menu(root)
+
+    language_menu = tk.Menu(menubar, tearoff=0)
+    for lang_code in ["en", "pt", "es", "fr", "de", "it"]:
+        lang_name = load_translation(lang_code)["language_name"]
+        language_menu.add_command(label=lang_name, command=lambda l=lang_code: update_language(l))
+    menubar.add_cascade(label=translate("language_menu"), menu=language_menu)
+
+    theme_menu = tk.Menu(menubar, tearoff=0)
+    for theme in root.style.theme_names():
+        theme_menu.add_command(label=theme, command=lambda t=theme: update_theme(t))
+    menubar.add_cascade(label=translate("theme_menu"), menu=theme_menu)
+
+    about_menu = tk.Menu(menubar, tearoff=0)
+    about_menu.add_command(label="GitHub", command=open_about)
+    menubar.add_cascade(label=translate("about_menu"), menu=about_menu)
+
+    root.config(menu=menubar)
 
     text_log = tk.Text(root, wrap=tk.WORD, font=("Consolas", 10), height=10)
     text_log.pack(expand=True, fill='both', padx=10, pady=10)
@@ -18,15 +69,17 @@ def main():
     progress.pack(pady=10)
 
     convert_time_var = tk.BooleanVar(value=False)
-    ttk.Checkbutton(
+    convert_time_check = ttk.Checkbutton(
         root,
-        text="Convert 'Time' to readable format",
+        text=translate("convert_time"),
         variable=convert_time_var,
         bootstyle="info"
-    ).pack(pady=5)
+    )
+    convert_time_check.pack(pady=5)
 
     filter_type_var = tk.StringVar(value="in")
-    ttk.Label(root, text="Select filter type:", bootstyle="info").pack(pady=5)
+    filter_label = ttk.Label(root, text=translate("select_filter_type"), bootstyle="info")
+    filter_label.pack(pady=5)
     filter_type_combobox = ttk.Combobox(
         root,
         textvariable=filter_type_var,
@@ -43,25 +96,25 @@ def main():
         root.update()
 
     def filtrar_csv():
-        log("Opening file selector...")
+        log(translate("select_file"))
         arquivo_csv = filedialog.askopenfilename(
-            title="Select the CSV file",
+            title=translate("select_file"),
             filetypes=[("CSV Files", "*.csv")]
         )
 
         if not arquivo_csv:
-            log("No file selected.")
+            log(translate("no_file_selected"))
             return
 
-        log(f"Selected file: {arquivo_csv}")
+        log(f"{translate('file_selected')} {arquivo_csv}")
 
         try:
             progress.start()
             df = pd.read_csv(arquivo_csv)
-            log("CSV file loaded successfully.")
+            log(translate("csv_loaded"))
         except Exception as e:
             progress.stop()
-            log(f"Error loading file: {e}")
+            log(f"{translate('error_loading')} {e}")
             return
 
         try:
@@ -78,23 +131,24 @@ def main():
                 df_filtered = df[(df['Type'].isin(['in', 'miss'])) & (time_as_datetime.dt.year == 2024)]
                 suffix = "both"
 
-            log(f"Total filtered calls ({filter_type}): {len(df_filtered)}")
+            log(translate("total_filtered", filter_type=filter_type))
 
             if convert_time_var.get():
                 df_filtered['Time'] = time_as_datetime.dt.strftime('%Y-%m-%d %H:%M:%S')
-                log("Field 'Time' converted to readable format.")
+                log(translate("time_converted"))
 
             base, ext = os.path.splitext(arquivo_csv)
             new_file = f"{base}_FILTERED_{suffix}.csv"
             df_filtered.to_csv(new_file, index=False)
-            log(f"Filtered file saved as: {new_file}")
-            messagebox.showinfo("Success", f"File saved as:\n{new_file}")
+            log(f"{translate('file_saved')} {new_file}")
+            messagebox.showinfo(translate("success"), f"{translate('file_saved')}:\n{new_file}")
         except Exception as e:
-            log(f"Error processing: {e}")
+            log(f"{translate('error_processing')} {e}")
         finally:
             progress.stop()
 
-    ttk.Button(root, text="Select and Filter CSV", command=filtrar_csv, bootstyle=SUCCESS).pack(pady=10)
+    filter_button = ttk.Button(root, text=translate("filter_button"), command=filtrar_csv, bootstyle=SUCCESS)
+    filter_button.pack(pady=10)
 
     root.mainloop()
 
