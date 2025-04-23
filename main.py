@@ -93,7 +93,7 @@ def main():
     root.minsize(800, 600) 
 
     icon_path = "assets/csv.ico"
-    if os.path.exists(icon_path):
+    if (os.path.exists(icon_path)):
         root.iconbitmap(icon_path)
 
     root.grid_rowconfigure(0, weight=1)
@@ -195,7 +195,9 @@ def main():
                 log(f"{translate('csv_loaded')} {arquivo_csv}")
             except Exception as e:
                 progress.stop()
-                log(f"{translate('error_loading')} {arquivo_csv}: {e}")
+                error_message = f"{translate('error_loading')} {arquivo_csv}: {e}"
+                log(error_message)
+                messagebox.showerror(translate("error_loading"), error_message)
                 continue
 
             try:
@@ -227,7 +229,9 @@ def main():
                 df_filtered.to_csv(new_file, index=False)
                 log(f"{translate('file_saved')} {new_file}")
             except Exception as e:
-                log(f"{translate('error_processing')} {arquivo_csv}: {e}")
+                error_message = f"{translate('error_processing')} {arquivo_csv}: {e}"
+                log(error_message)
+                messagebox.showerror(translate("error_processing"), error_message)
             finally:
                 progress.stop()
 
